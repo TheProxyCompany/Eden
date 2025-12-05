@@ -23,7 +23,7 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>SUFeedURL</key>
-	<string>https://prod.proxy.ing/storage/v1/object/public/eden-releases/appcast.xml</string>
+	<string>https://iiuflubuppphtlyqrkor.supabase.co/storage/v1/object/public/eden-releases/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>qv3JZbXyRjh6z5QjRDBuV7mI8C+qAQzVw/yd8c3VxO8=</string>
 </dict>

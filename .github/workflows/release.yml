@@ -108,7 +108,7 @@ jobs:
           echo "$SPARKLE_PRIVATE_KEY" | \
             ./bin/generate_appcast \
             --ed-key-file - \
-            --download-url-prefix "https://prod.proxy.ing/storage/v1/object/public/eden-releases/" \
+            --download-url-prefix "https://iiuflubuppphtlyqrkor.supabase.co/storage/v1/object/public/eden-releases/" \
             releases/
 
       - name: Set Supabase URL
