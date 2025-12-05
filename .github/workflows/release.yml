@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: [self-hosted, terminal-0]
     env:
       PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
     steps:
@@ -37,7 +37,7 @@ jobs:
 
   build-and-publish:
     needs: test
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: [self-hosted, terminal-0]
     env:
       APP_NAME: Eden
       PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
