@@ -1,31 +1,56 @@
-name: Release Eden
+name: Publish Eden Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version_bump:
-        description: 'Version bump type'
-        required: false
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
+
+concurrency:
+  group: publish-eden
+  cancel-in-progress: false
 
 jobs:
-  release:
-    runs-on: macos-15
+  test:
+    runs-on: [self-hosted, terminal-0]
     env:
-      APP_NAME: Eden
-      DEVELOPER_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
+      PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0
+
+      - name: Install build tools
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          brew list xcodegen || brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Build and Test
+        run: |
+          xcodebuild -scheme "Eden" \
+                     -project "Eden.xcodeproj" \
+                     -destination "platform=macOS" \
+                     build test \
+                     CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+
+  build-and-publish:
+    needs: test
+    runs-on: [self-hosted, terminal-0]
+    env:
+      APP_NAME: Eden
+      PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+      DEVELOPER_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Load secrets from 1Password
-        id: op-secrets
         uses: 1password/load-secrets-action@v1
         with:
           export-env: true
@@ -39,13 +64,36 @@ jobs:
           SUPABASE_ACCESS_TOKEN: op://Eden-Prod/SUPABASE_SERVICE_KEY/password
           SUPABASE_PROJECT_ID: op://Eden-Prod/SUPABASE_PROJECT_ID/password
 
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '16.1'
+      - name: Install build tools
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          brew list xcodegen || brew install xcodegen
+          brew list jq || brew install jq
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Calculate version
+        id: version
+        run: |
+          YEAR=$(date +%Y)
+          MONTH=$(date +%-m)
+
+          # Get latest tag for this month, extract patch number
+          LATEST=$(git tag -l "v${YEAR}.${MONTH}.*" --sort=-v:refname | head -n1)
+
+          if [ -z "$LATEST" ]; then
+            PATCH=1
+          else
+            CURRENT_PATCH=$(echo "$LATEST" | sed "s/v${YEAR}\.${MONTH}\.\([0-9]*\)/\1/")
+            PATCH=$((CURRENT_PATCH + 1))
+          fi
+
+          VERSION="${YEAR}.${MONTH}.${PATCH}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Releasing v${VERSION}"
+
+      - name: Update project.yml version
+        run: |
+          sed -i '' "s/MARKETING_VERSION: .*/MARKETING_VERSION: ${{ steps.version.outputs.VERSION }}/" project.yml
+          sed -i '' "s/CURRENT_PROJECT_VERSION: .*/CURRENT_PROJECT_VERSION: ${{ github.run_number }}/" project.yml
 
       - name: Generate Xcode Project
         run: xcodegen generate
@@ -53,7 +101,7 @@ jobs:
       - name: Install Signing Certificate
         run: |
           echo -n "$MACOS_CERTIFICATE" | base64 --decode -o certificate.p12
-          security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" build.keychain
+          security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" build.keychain || true
           security default-keychain -s build.keychain
           security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" build.keychain
           security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
@@ -77,14 +125,32 @@ jobs:
             --timestamp \
             "$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app"
 
-      - name: Zip the App
+      - name: Get release notes
+        id: release_notes
         run: |
-          PLIST_PATH="$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app/Contents/Info.plist"
-          SHORT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$PLIST_PATH")
-          BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$PLIST_PATH")
-          APP_VERSION="v$SHORT_VERSION-b$BUILD_NUMBER"
+          LAST_TAG=$(git tag -l "v*" --sort=-v:refname | head -n1)
+          if [ -z "$LAST_TAG" ]; then
+            NOTES="Initial release"
+          else
+            NOTES=$(git log --oneline ${LAST_TAG}..HEAD | head -20)
+          fi
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Zip the App
+        id: archive
+        run: |
+          APP_VERSION="v${{ steps.version.outputs.VERSION }}"
+          ARCHIVE_NAME="${APP_NAME}-${APP_VERSION}.zip"
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          ditto -c -k --sequesterRsrc --keepParent "$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app" "$APP_NAME-$APP_VERSION.zip"
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
+          ditto -c -k --sequesterRsrc --keepParent "$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app" "$ARCHIVE_NAME"
+
+      - name: Generate SHA256
+        run: |
+          shasum -a 256 "${{ steps.archive.outputs.ARCHIVE_NAME }}" \
+            > "${{ steps.archive.outputs.ARCHIVE_NAME }}.sha256"
 
       - name: Notarize App
         run: |
@@ -93,7 +159,15 @@ jobs:
             --password "$DEVELOPER_APP_SPECIFIC_PASSWORD" \
             --team-id "$DEVELOPER_TEAM_ID" \
             --wait \
-            "$APP_NAME-$APP_VERSION.zip"
+            "${{ steps.archive.outputs.ARCHIVE_NAME }}"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.ARCHIVE_NAME }}
+          path: |
+            ${{ steps.archive.outputs.ARCHIVE_NAME }}
+            ${{ steps.archive.outputs.ARCHIVE_NAME }}.sha256
 
       - name: Download Sparkle Tools
         run: |
@@ -103,8 +177,8 @@ jobs:
 
       - name: Generate Appcast
         run: |
-          mkdir releases
-          mv "$APP_NAME-$APP_VERSION.zip" releases/
+          mkdir -p releases
+          cp "${{ steps.archive.outputs.ARCHIVE_NAME }}" releases/
           echo "$SPARKLE_PRIVATE_KEY" | \
             ./bin/generate_appcast \
             --ed-key-file - \
@@ -112,24 +186,29 @@ jobs:
             releases/
 
       - name: Set Supabase URL
-        run: echo "SUPABASE_URL=https://${{ env.SUPABASE_PROJECT_ID }}.supabase.co" >> $GITHUB_ENV
+        run: echo "SUPABASE_URL=https://$SUPABASE_PROJECT_ID.supabase.co" >> $GITHUB_ENV
 
       - name: Upload Release to Supabase Storage
         uses: status-base/upload-file-to-supabase-storage@v1.0.3
-        env:
-          SUPABASE_URL: ${{ env.SUPABASE_URL }}
         with:
-          file_path: releases/${{ env.APP_NAME }}-${{ env.APP_VERSION }}.zip
+          file_path: releases/${{ steps.archive.outputs.ARCHIVE_NAME }}
           bucket: eden-releases
           content_type: application/zip
           upsert: true
 
       - name: Upload Appcast to Supabase Storage
         uses: status-base/upload-file-to-supabase-storage@v1.0.3
-        env:
-          SUPABASE_URL: ${{ env.SUPABASE_URL }}
         with:
           file_path: releases/appcast.xml
           bucket: eden-releases
           content_type: application/xml
           upsert: true
+
+      - name: Tag release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add project.yml
+          git commit -m "v${{ steps.version.outputs.VERSION }}" || true
+          git tag -a "v${{ steps.version.outputs.VERSION }}" -m "Release v${{ steps.version.outputs.VERSION }}"
+          git push origin main --tags
