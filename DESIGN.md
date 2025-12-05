@@ -12,6 +12,20 @@ If Orchard is the compute provider (the inference engine, the backend), then Ede
 
 Easy to learn. Easy to master. General purpose. Always available.
 
+### North Star
+
+Eden should feel like sitting in a quiet, high-ceilinged room where everything you need is within reach and nothing else is clamoring for your attention.
+
+- It's not a website. It's a place.
+- It adapts to you instead of forcing you into its structure.
+- It makes your computer feel less like a pile of windows and more like a single coherent instrument.
+
+### What Eden is Not
+
+- Not "another chat app" glued on top of models
+- Not a dark-pattern attention farm, feed, or timeline
+- Not an "AI front-end" where the selling point is which logo is in the corner
+
 ---
 
 ## The Relationship
@@ -115,15 +129,35 @@ But the interface comes after the foundation is solid.
 
 Eden's interface is guided by a multi-faceted design philosophy that draws from architecture, spatial computing, and a touch of magic.
 
+### The Orchard Style
+
+Our design language is **Organic Humanist Classicism**.
+
+- **Classical bones** - proportion, hierarchy, rhythm
+- **Organic flesh** - warmth, asymmetry, lived-in details
+- **Humanist soul** - everything exists to serve a person at a desk, not a screenshot on Twitter
+
+This isn't futurism. It's not cyberpunk. It's not Apple's minimal modernism. It's:
+
+> Big, calm, deliberate spaces that care about humans and nature, not spectacle.
+
+In software, almost nobody is doing this. The market is brutalist web, flat minimalism, SaaS dashboard chic, Discord gamer UI. No one is seriously trying to make "a chapel you can think inside of" as an app.
+
 ### The Governing Metaphor
 
 **The Room of Requirement** - A space that becomes what you need. Contains more than its physical dimensions allow. Adapts, reconfigures, reveals.
 
 This isn't decoration. It's the core principle: the interface is a *space*, not a surface.
 
+In Eden, the main workspace is internally called **The Room**. It's the primary "room of requirement" - a single place that reshapes itself around what you're doing, instead of forcing you to hop between apps and tabs.
+
+The architectural vocabulary: rooms, halls, atriums, balconies. The Room of Requirement is simply the platonic ideal room - the one that always has what you need.
+
 ---
 
 ### The Six Pillars
+
+Each pillar is a test. When shipping any view, ask the question.
 
 #### 1. The Cockpit Principle
 
@@ -132,6 +166,8 @@ The screen is a **windshield**, not a page. The user sits in a command position,
 - Every element is instrumentation, positioned with pilot intentionality
 - Nothing decorative - everything functional, but beautiful in its function
 - The HUD serves the mission
+
+**Design check**: *"Is this arranged like an instrument panel or like a brochure?"*
 
 #### 2. Physical Inches, Not Pixels
 
@@ -142,6 +178,8 @@ Design the interface like **furniture**. Like architecture. The screen is a phys
 - Design for a body sitting in front of glass
 - Think in inches, not pixels
 
+**Design check**: *"Would this feel good to use on an actual physical console?"*
+
 #### 3. The Skyscraper Constraint
 
 The screen is fixed. You can't make it bigger. But you can make the space *inside* feel infinite.
@@ -149,6 +187,8 @@ The screen is fixed. You can't make it bigger. But you can make the space *insid
 - **Depth over sprawl** - layers, z-space, things that recede and approach
 - Not scrolling, but *navigation through volume*
 - The fixed window opens onto an unbounded world
+
+**Design check**: *"Am I respecting the fixed glass and using depth instead of sprawl?"*
 
 #### 4. Harry Potter Spatial Magic
 
@@ -159,6 +199,8 @@ Small spaces that feel vast. The tent that's a mansion inside.
 - **Transitions that reveal** - places *emerge*, you don't navigate *to* them
 - **Focus as expansion** - attention causes the relevant to fill perception
 
+**Design check**: *"When context changes, does it emerge or does it yank the user somewhere?"*
+
 #### 5. Renaissance Proportion
 
 Classical harmony. Every element in its divine ratio.
@@ -168,6 +210,8 @@ Classical harmony. Every element in its divine ratio.
 - The cathedral effect: feeling small but elevated
 - Golden ratios, intentional proportion, nothing accidental
 
+**Design check**: *"Is the layout in tune?"*
+
 #### 6. Organic Integration (Frank Lloyd Wright)
 
 UI that feels like it **grew from the ground**. Not widgets bolted onto a canvas.
@@ -176,6 +220,8 @@ UI that feels like it **grew from the ground**. Not widgets bolted onto a canvas
 - Fallingwater doesn't sit *next to* the waterfall - it's *part of* it
 - Eden's interface shouldn't feel like software on a screen
 - It should feel like the screen *became* this
+
+**Design check**: *"Does this feel like a single organism or a bunch of widgets?"*
 
 ---
 
