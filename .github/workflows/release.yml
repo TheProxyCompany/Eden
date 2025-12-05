@@ -1,0 +1,135 @@
+name: Release Eden
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: macos-15
+    env:
+      APP_NAME: Eden
+      DEVELOPER_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        id: op-secrets
+        uses: 1password/load-secrets-action@v1
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          DEVELOPER_ID_EMAIL: op://Orchard-Prod/APPLE_APP_SPECIFIC_PASSWORD/username
+          DEVELOPER_APP_SPECIFIC_PASSWORD: op://Orchard-Prod/APPLE_APP_SPECIFIC_PASSWORD/password
+          MACOS_CERTIFICATE: op://Orchard-Prod/MACOS_CERTIFICATE/password
+          MACOS_CERTIFICATE_PASSWORD: op://Orchard-Prod/MACOS_CERTIFICATE_PASSWORD/password
+          SPARKLE_PRIVATE_KEY: op://Orchard-Prod/SPARKLE_PRIVATE_KEY/password
+          SUPABASE_ACCESS_TOKEN: op://Orchard-Prod/SUPABASE_SERVICE_KEY/password
+          SUPABASE_PROJECT_ID: op://Orchard-Prod/SUPABASE_PROJECT_ID/password
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.1'
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Install Signing Certificate
+        run: |
+          echo -n "$MACOS_CERTIFICATE" | base64 --decode -o certificate.p12
+          security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_CERTIFICATE_PASSWORD" build.keychain
+          rm certificate.p12
+
+      - name: Build and Archive
+        run: |
+          xcodebuild archive \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$APP_NAME" \
+            -destination "generic/platform=macOS" \
+            -archivePath "$APP_NAME.xcarchive" \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$DEVELOPER_TEAM_ID"
+
+      - name: Deep Sign App Bundle
+        run: |
+          codesign --force --deep --options=runtime --sign "Developer ID Application" \
+            --timestamp \
+            "$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app"
+
+      - name: Zip the App
+        run: |
+          PLIST_PATH="$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app/Contents/Info.plist"
+          SHORT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$PLIST_PATH")
+          BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$PLIST_PATH")
+          APP_VERSION="v$SHORT_VERSION-b$BUILD_NUMBER"
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          ditto -c -k --sequesterRsrc --keepParent "$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app" "$APP_NAME-$APP_VERSION.zip"
+
+      - name: Notarize App
+        run: |
+          xcrun notarytool submit \
+            --apple-id "$DEVELOPER_ID_EMAIL" \
+            --password "$DEVELOPER_APP_SPECIFIC_PASSWORD" \
+            --team-id "$DEVELOPER_TEAM_ID" \
+            --wait \
+            "$APP_NAME-$APP_VERSION.zip"
+
+      - name: Download Sparkle Tools
+        run: |
+          curl -L https://github.com/sparkle-project/Sparkle/releases/download/2.7.1/Sparkle-2.7.1.tar.xz --output sparkle.tar.xz
+          tar -xf sparkle.tar.xz
+          rm sparkle.tar.xz
+
+      - name: Generate Appcast
+        run: |
+          mkdir releases
+          mv "$APP_NAME-$APP_VERSION.zip" releases/
+          echo "$SPARKLE_PRIVATE_KEY" | \
+            ./bin/generate_appcast \
+            --ed-key-file - \
+            --download-url-prefix "https://prod.proxy.ing/storage/v1/object/public/eden-releases/" \
+            releases/
+
+      - name: Set Supabase URL
+        run: echo "SUPABASE_URL=https://${{ env.SUPABASE_PROJECT_ID }}.supabase.co" >> $GITHUB_ENV
+
+      - name: Upload Release to Supabase Storage
+        uses: status-base/upload-file-to-supabase-storage@v1.0.3
+        env:
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+        with:
+          file_path: releases/${{ env.APP_NAME }}-${{ env.APP_VERSION }}.zip
+          bucket: eden-releases
+          content_type: application/zip
+          upsert: true
+
+      - name: Upload Appcast to Supabase Storage
+        uses: status-base/upload-file-to-supabase-storage@v1.0.3
+        env:
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+        with:
+          file_path: releases/appcast.xml
+          bucket: eden-releases
+          content_type: application/xml
+          upsert: true
