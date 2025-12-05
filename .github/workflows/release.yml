@@ -31,13 +31,13 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          DEVELOPER_ID_EMAIL: op://Orchard-Prod/APPLE_APP_SPECIFIC_PASSWORD/username
-          DEVELOPER_APP_SPECIFIC_PASSWORD: op://Orchard-Prod/APPLE_APP_SPECIFIC_PASSWORD/password
-          MACOS_CERTIFICATE: op://Orchard-Prod/MACOS_CERTIFICATE/password
-          MACOS_CERTIFICATE_PASSWORD: op://Orchard-Prod/MACOS_CERTIFICATE_PASSWORD/password
-          SPARKLE_PRIVATE_KEY: op://Orchard-Prod/SPARKLE_PRIVATE_KEY/password
-          SUPABASE_ACCESS_TOKEN: op://Orchard-Prod/SUPABASE_SERVICE_KEY/password
-          SUPABASE_PROJECT_ID: op://Orchard-Prod/SUPABASE_PROJECT_ID/password
+          DEVELOPER_ID_EMAIL: op://Eden-Prod/APPLE_APP_SPECIFIC_PASSWORD/username
+          DEVELOPER_APP_SPECIFIC_PASSWORD: op://Eden-Prod/APPLE_APP_SPECIFIC_PASSWORD/password
+          MACOS_CERTIFICATE: op://Eden-Prod/MACOS_CERTIFICATE/password
+          MACOS_CERTIFICATE_PASSWORD: op://Eden-Prod/MACOS_CERTIFICATE_PASSWORD/password
+          SPARKLE_PRIVATE_KEY: op://Eden-Prod/SPARKLE_PRIVATE_KEY/password
+          SUPABASE_ACCESS_TOKEN: op://Eden-Prod/SUPABASE_SERVICE_KEY/password
+          SUPABASE_PROJECT_ID: op://Eden-Prod/SUPABASE_PROJECT_ID/password
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
